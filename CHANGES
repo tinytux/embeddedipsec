@@ -5,6 +5,10 @@
 *****************************************************************************
  * = public release versions
 
+ *Changes in 1.1 (28.06.2004) by CS&NS
+    - Bug fixed in ipsec_update_replay_window(): corrected error-bitmask update functionality
+    - Added test case for anti-replay code.
+
  *Changes in 1.0 (12.12.2003) by CS&NS
     - basic IPsec implementation for 16-bit embedded systems
     - First public release

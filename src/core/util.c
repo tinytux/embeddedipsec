@@ -437,16 +437,19 @@ ipsec_audit ipsec_check_replay_window(__u32 seq, __u32 lastSeq, __u32 bitField)
     if(seq > lastSeq) 					/* new larger sequence number  */
     {  
         diff = seq - lastSeq;
+
+	    /* only accept new number if delta is not > IPSEC_SEQ_MAX_WINDOW */
+	    if(diff >= IPSEC_SEQ_MAX_WINDOW) return IPSEC_AUDIT_SEQ_MISMATCH;
     }
     else {								/* new smaller sequence number */
     	diff = lastSeq - seq;
+
+	    /* only accept new number if delta is not > IPSEC_SEQ_MAX_WINDOW */
+	    if(diff >= IPSEC_SEQ_MAX_WINDOW) return IPSEC_AUDIT_SEQ_MISMATCH;
+
+	    /* already seen */
+	    if(bitField & ((__u32)1 << diff)) return IPSEC_AUDIT_SEQ_MISMATCH; 
     }
-   
-    /* only accept new number if delta is not > IPSEC_SEQ_MAX_WINDOW */
-    if(diff >= IPSEC_SEQ_MAX_WINDOW) return IPSEC_AUDIT_SEQ_MISMATCH;
-    
-    /* already seen */
-    if(bitField & ((__u32)1 << diff)) return IPSEC_AUDIT_SEQ_MISMATCH; 
     
     return IPSEC_AUDIT_SUCCESS;
 }
@@ -474,8 +477,8 @@ ipsec_audit ipsec_update_replay_window(__u32 seq, __u32 *lastSeq, __u32 *bitFiel
         diff = seq - *lastSeq;
         if (diff < IPSEC_SEQ_MAX_WINDOW) {  	/* In window */
             *bitField <<= diff;
-            *bitField |= IPSEC_AUDIT_SUCCESS;	/* set bit for this packet 			*/
-        } else *bitField = IPSEC_AUDIT_SUCCESS;	/* This packet has a "way larger" 	*/
+            *bitField |= 1;	         			/* set bit for this packet 			*/
+        } else *bitField = 1;					/* This packet has a "way larger" 	*/
         *lastSeq = seq;
         return IPSEC_AUDIT_SUCCESS;  			/* larger is good */
     }

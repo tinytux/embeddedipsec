@@ -51,6 +51,7 @@
 
 #include "ipsec/util.h"
 #include "ipsec/debug.h"
+#include "ipsec/ipsec.h"
 #include "testing/structural/structural_test.h"
 
 /**
@@ -110,6 +111,145 @@ int test_ipsec_inet_addr(void)
 	return local_error_count ;
 }
 
+
+
+/**
+ * Testfunciton for ipsec_update_replay_window
+ * @return int number of tests failed in this function
+ */
+int util_test_ipsec_update_replay_window() 
+{
+	int local_error_count = 0;
+	int i, errors;
+	__u32 bitmap;   			/* saved session state to detect replays - must be 32 bits. */
+	__u32 lastSeq;        		/* saved session state to detect replays */
+	__u32 test_sequence;
+
+
+
+	/* Test 1: sequence number is increasing strictly from 1 to 101 */
+	/* Expected result: checks and updates should pass error free   */
+	bitmap 			= 0;
+	lastSeq 		= 0;
+	test_sequence 	= 1;
+	errors 			= 0;
+	
+	for(i = 0; i < 100; i++) 
+	{
+		/* check window */	   
+		if(ipsec_check_replay_window(test_sequence, lastSeq, bitmap) != IPSEC_AUDIT_SUCCESS)
+		{
+//			IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay check (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+			errors++;
+		}
+
+		/* update window */
+		if(ipsec_update_replay_window(test_sequence, (__u32 *)&lastSeq, (__u32 *)&bitmap) != IPSEC_AUDIT_SUCCESS)
+		{
+//			IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay update (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+			errors++;
+		}
+
+		/* update sequence */
+		test_sequence++;
+	}
+	
+	if(errors != 0)
+	{
+		local_error_count++ ;
+		IPSEC_LOG_TST(util_test_ipsec_update_replay_window, "FAILURE", ("%d errors when sequence number is increasing strictly - this should be error free!", errors)) ;
+	}
+	  
+
+
+	/* Test 2: replay detection - sequence counting from 0..100, then repeating 90..95 */
+	/* Expected result: 6 packets should fail  */
+	bitmap 			= 0xFFFFFFFF;
+	lastSeq 		= 0x00000064;
+	test_sequence 	= 0x00000065;
+	errors 			= 0;
+
+ 	// Simulate Replay of packet 90 to 95
+	test_sequence = 90;
+	for(i = 0; i < 6; i++) 
+	{
+		/* check window */	   
+		if(ipsec_check_replay_window(test_sequence, lastSeq, bitmap) != IPSEC_AUDIT_SUCCESS)
+		{
+//			IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay check (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+			errors++;
+		}
+
+		/* update window */
+		if(ipsec_update_replay_window(test_sequence, (__u32 *)&lastSeq, (__u32 *)&bitmap) != IPSEC_AUDIT_SUCCESS)
+		{
+//			IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay update (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+			errors++;
+		}
+
+		/* update sequence */
+		test_sequence++;
+	}
+	
+	if(errors != 12)
+	{
+		local_error_count++ ;
+		IPSEC_LOG_TST(util_test_ipsec_update_replay_window, "FAILURE", ("Replay check did not work - %d errors detected (expected: 12 errors)", errors)) ;
+	}
+	  
+
+
+	/* Test 3: out of window tests */
+	/* Expected result: sequence numbers outside the window should be rejected */
+	bitmap 			= 0xFFFFFFFF;
+	lastSeq 		= IPSEC_SEQ_MAX_WINDOW * 5 - 1;
+	test_sequence 	= IPSEC_SEQ_MAX_WINDOW * 5;
+	errors 			= 0;
+
+
+	// Test packet with too low  sequence number
+	test_sequence 	= IPSEC_SEQ_MAX_WINDOW * 2;
+	
+	/* check window */	   
+	if(ipsec_check_replay_window(test_sequence, lastSeq, bitmap) != IPSEC_AUDIT_SUCCESS)
+	{
+//		IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay check (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+		errors++;
+	}
+	/* update window */
+	if(ipsec_update_replay_window(test_sequence, (__u32 *)&lastSeq, (__u32 *)&bitmap) != IPSEC_AUDIT_SUCCESS)
+	{
+//		IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay update (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+		errors++;
+	}
+
+	// Test packet with too high sequence number
+	test_sequence 	= IPSEC_SEQ_MAX_WINDOW * 8;
+	
+	/* check window */	   
+	if(ipsec_check_replay_window(test_sequence, lastSeq, bitmap) != IPSEC_AUDIT_SUCCESS)
+	{
+//		IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay check (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+		errors++;
+	}
+	/* update window */
+	if(ipsec_update_replay_window(test_sequence, (__u32 *)&lastSeq, (__u32 *)&bitmap) != IPSEC_AUDIT_SUCCESS)
+	{
+//		IPSEC_LOG_TST("util_test_ipsec_update_replay_window", "FAILURE", ("packet rejected by anti-replay update (lastSeq=%08lx, seq=%08lx, window size=%d)", lastSeq, test_sequence, IPSEC_SEQ_MAX_WINDOW) );
+		errors++;
+	}
+	
+	if(errors != 3)
+	{
+		local_error_count++ ;
+		IPSEC_LOG_TST(util_test_ipsec_update_replay_window, "FAILURE", ("Out-of-window tests failed.")) ;
+	}
+
+
+
+	return local_error_count;
+}
+
 /**
  * Test function for all the log functions
  * (Note: some of these tests are commented out by default to make the log output more uniform)
@@ -117,8 +257,8 @@ int test_ipsec_inet_addr(void)
 void util_debug_test(test_result *global_results)
 {
 	test_result 	sub_results	= {
-						  6, 			
-						  1,			
+						  9,
+						  2,			
 						  0, 		
 						  0, 	
 					};
@@ -145,6 +285,8 @@ void util_debug_test(test_result *global_results)
 	retcode = test_ipsec_inet_addr() ;
 	IPSEC_TESTING_EVALUATE(retcode, sub_results, "test_util_ipsec_inet_addr()", (" "));
 
+	retcode = util_test_ipsec_update_replay_window();
+	IPSEC_TESTING_EVALUATE(retcode, sub_results, "util_test_ipsec_update_replay_window()", (" "));
 
 
 	global_results->tests += sub_results.tests;
