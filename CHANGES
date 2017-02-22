@@ -1,0 +1,11 @@
+*****************************************************************************
+**  
+**  Change log of the embedded IPsec Implementation
+**
+*****************************************************************************
+ * = public release versions
+
+ *Changes in 1.0 (12.12.2003) by CS&NS
+    - basic IPsec implementation for 16-bit embedded systems
+    - First public release
+
